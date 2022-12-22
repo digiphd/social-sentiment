@@ -3,7 +3,7 @@ import streamlit as st
 
 from bin.TwitterSentiment import twitterSentiment
 
-st.set_page_config(page_title="Transcribe", page_icon="💬‍")
+st.set_page_config(page_title="Social Sentiment", page_icon="💬‍")
 st.markdown("# Check Social Sentiment on Any Issue 💬")
 
 c1, c2, c3 = st.columns([1, 4, 1])
