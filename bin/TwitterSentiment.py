@@ -218,9 +218,9 @@ class twitterSentiment():
         return result
 
 if __name__ == "__main__":
-    # query = "#greens OR #alp lang:en"
-    query = "#lnp lang:en"
-    max_results = 1000
+
+    query = "#football lang:en"
+    max_results = 500
     out = twitterSentiment(query, max_results)
     out.launchAnalysis()
 
