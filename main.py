@@ -11,7 +11,7 @@ c1, c2, c3 = st.columns([1, 4, 1])
 with c2:
     input = st.text_input("Search Term or Hashtag", value="football")
     input = '\"'+input+'\"'
-    value = st.slider('Number of tweets to Analyse', min_value=100, max_value=1000)
+    value = st.slider('Number of tweets to Analyse', min_value=100, max_value=500)
     result = st.button("Get Sentiment")
 
     if result:
