@@ -1,24 +1,21 @@
 import tweepy
-import configparser
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from transformers import pipeline
 from scipy.special import softmax
 import time
 import math
 import pandas as pd
+import streamlit as st
 
 
-# read config
+api_key = st.secrets['twitter']['api_key']
+api_key_secret = st.secrets['twitter']['api_key_secret']
+access_token = st.secrets['twitter']['access_token']
+access_token_secret = st.secrets['twitter']['access_token_secret']
+bearer_token = st.secrets['twitter']['bearer_token']
 
-config = configparser.ConfigParser(interpolation=None)
-config.read('config.ini')
-
-api_key = config['twitter']['api_key']
-api_key_secret = config['twitter']['api_key_secret']
-access_token = config['twitter']['access_token']
-access_token_secret = config['twitter']['access_token_secret']
-bearer_token = config['twitter']['bearer_token']
 MODEL = "cardiffnlp/twitter-roberta-base-sentiment-latest"
+# model from https://huggingface.co/cardiffnlp/twitter-roberta-base-sentiment-latest
 
 
 # authentication with twitter
@@ -48,13 +45,12 @@ class twitterSentiment():
         tweet_fields = ['created_at', 'text', 'author_id', 'context_annotations','geo', 'lang', 'public_metrics']
         # tweet_fields = ['public_mentrics']
 
-
         # Get Restuls with Pagination
         if self.max_results >100:
             #calculate limit
 
             public_tweets = []
-            limit = math.ceil(max_results/100)
+            limit = math.ceil(self.max_results/100)
             paginator = tweepy.Paginator(
                 client.search_recent_tweets,
                 query=self.query,
@@ -63,11 +59,11 @@ class twitterSentiment():
                 expansions=['author_id'],
                 limit=limit
             )
-            for tweet in paginator.flatten(limit=max_results):  # Total number of tweets to retrieve
+            for tweet in paginator.flatten(limit=self.max_results):  # Total number of tweets to retrieve
 
                 public_tweets.extend([tweet])
         else:
-            public_tweets_response = client.search_recent_tweets(query=self.query, max_results=max_results, tweet_fields=tweet_fields,
+            public_tweets_response = client.search_recent_tweets(query=self.query, max_results=self.max_results, tweet_fields=tweet_fields,
                                                     expansions=['author_id'])
             public_tweets = public_tweets_response.data
 
@@ -152,7 +148,7 @@ class twitterSentiment():
         tokenizer = AutoTokenizer.from_pretrained(MODEL)
         # tokenizer.save_pretrained(roberta)
 
-        labels = ['Negative', 'Neutral', 'Postitive']
+        labels = ['Negative', 'Neutral', 'Positive']
 
         # sentiment analysis
         encoded_tweet = tokenizer(tweet_proc, return_tensors='pt')
@@ -179,7 +175,7 @@ class twitterSentiment():
             tweet['sentiment'] = results[0]['label']
 
             classified_tweets.extend([tweet])
-        # print(classified_tweets)
+
         return classified_tweets
 
     def calculateAverage(self, classified_tweets):
@@ -189,30 +185,27 @@ class twitterSentiment():
         negative = 0
         for tweet in classified_tweets:
 
-            if tweet['sentiment'] == 'Positive':
+            if tweet['sentiment'] == 'positive':
                 positive+=1
-            elif tweet['sentiment'] == 'Neutral':
+            elif tweet['sentiment'] == 'neutral':
                 neutral+=1
-            elif tweet['sentiment'] == 'Negative':
+            elif tweet['sentiment'] == 'negative':
                 negative+=1
             else:
                 print(tweet['sentiment'])
 
         print("Overall Sentiment: ", "Positive %: "+str(positive/len(classified_tweets)), "Neutral %: "+str(neutral/len(classified_tweets)), "Negative %: "+str(negative/len(classified_tweets)))
-
+        return {'positive': positive/len(classified_tweets), 'neutral': neutral/len(classified_tweets), 'negative': negative/len(classified_tweets)}
 
     def launchAnalysis(self):
         st = time.time()
         tweets_dict, time_days = self.searchTweets()
 
         classified_tweets = self.classifyTweetsPipeline(tweets_dict)
-        # Print individual tweet results for debugging purposes
-        # for i, tweet in enumerate(classified_tweets):
-        #     # print(i, tweet['user_metrics']['location'], tweet['text'], tweet['sentiment'], '\n')
-        #     # print(i, ",Locale:" + str(tweet['user_metrics']['location']), ",Sentiment:" + tweet['sentiment'])
 
-        print(str(len(tweets_dict)) + " Tweets processed from the last " + str(time_days) + " for the query: "+ query )
-        self.calculateAverage(classified_tweets)
+
+        message = str(len(tweets_dict)) + " Tweets processed from the last " + str(time_days) + " for the query: "+ self.query
+        averages = self.calculateAverage(classified_tweets)
 
         et = time.time()
 
@@ -220,14 +213,15 @@ class twitterSentiment():
         elapsed_time = et - st
 
         time_per_tweet = elapsed_time/len(tweets_dict)
-        print('Execution time:', elapsed_time, 'seconds, Approx '+str(time_per_tweet)+' secs per tweet')
+        time_message = 'Execution time: '+str(round(elapsed_time, 2))+' seconds, Approx '+str(round(time_per_tweet, 2))+' secs per tweet'
+        result = {'averages':averages, 'message': message, 'time_message': time_message}
+        return result
 
-        return classified_tweets
+if __name__ == "__main__":
+    # query = "#greens OR #alp lang:en"
+    query = "#lnp lang:en"
+    max_results = 1000
+    out = twitterSentiment(query, max_results)
+    out.launchAnalysis()
 
 
-# query = "#greens OR #alp lang:en"
-query = "#lnp lang:en"
-max_results = 1000
-
-out = twitterSentiment(query, max_results)
-out.launchAnalysis()
